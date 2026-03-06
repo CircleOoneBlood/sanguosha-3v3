@@ -53,10 +53,15 @@ export class GameManager {
     return { playerId };
   }
 
-  startGame(roomId: string, actorPlayerId: string) {
+  startGame(roomId: string, actorPlayerId: string, options?: { devBypass?: boolean }) {
     const room = this.mustGetRoom(roomId);
     if (room.status !== "lobby") throw new Error("游戏状态错误");
-    if (room.players.length !== 6) throw new Error("3v3 模式必须满 6 人才能开始");
+
+    const allowDevBypass = process.env.ALLOW_DEV_BYPASS === "1";
+    const useBypass = options?.devBypass === true && allowDevBypass;
+
+    if (!useBypass && room.players.length !== 6) throw new Error("3v3 模式必须满 6 人才能开始");
+    if (useBypass && room.players.length < 2) throw new Error("测试开局至少需要 2 人");
 
     const actor = room.players.find((p) => p.id === actorPlayerId);
     if (!actor || room.players[0].id !== actor.id) {
@@ -86,7 +91,7 @@ export class GameManager {
     room.winnerTeam = undefined;
     this.drawForTurn(room, room.turnPlayerId!);
     room.phase = "play";
-    room.log.push("游戏开始：3v3 对战开始");
+    room.log.push(useBypass ? `游戏开始：测试模式开局（${room.players.length}人）` : "游戏开始：3v3 对战开始");
   }
 
   playSlash(roomId: string, actorPlayerId: string, targetPlayerId: string) {

@@ -63,6 +63,7 @@ export function App() {
   const me = room?.players.find((p) => p.id === playerId);
   const isMyTurn = room?.turnPlayerId === playerId;
   const canStart = room?.status === "lobby";
+  const showDevStart = import.meta.env.DEV;
 
   function send(msg: ClientMessage) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -114,6 +115,11 @@ export function App() {
             <button disabled={!canStart} onClick={() => send({ type: "start_game" })}>
               开始游戏（房主）
             </button>
+            {showDevStart && (
+              <button disabled={!canStart} onClick={() => send({ type: "start_game", devBypass: true })}>
+                测试开局（2+人）
+              </button>
+            )}
             <button disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing" || room.phase !== "play"} onClick={() => send({ type: "end_turn" })}>
               结束我的回合
             </button>

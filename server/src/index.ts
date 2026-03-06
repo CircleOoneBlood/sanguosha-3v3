@@ -53,7 +53,7 @@ wss.on("connection", (ws) => {
       const actor = game.getPlayerBySocket(room.id, socketId);
       if (!actor) throw new Error("玩家不存在");
 
-      if (msg.type === "start_game") game.startGame(room.id, actor.id);
+      if (msg.type === "start_game") game.startGame(room.id, actor.id, { devBypass: msg.devBypass === true });
       else if (msg.type === "end_turn") game.endTurn(room.id, actor.id);
       else if (msg.type === "play_slash") game.playSlash(room.id, actor.id, msg.targetPlayerId);
       else if (msg.type === "respond_dodge") game.respondDodge(room.id, actor.id);
