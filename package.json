@@ -12,9 +12,11 @@
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "lint": "echo 'lint placeholder'",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client",
-    "test:smoke": "node scripts-smoke-test.mjs"
+    "test:smoke": "node scripts-smoke-test.mjs",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "concurrently": "^9.0.1",
     "typescript": "^5.8.2"
   }
