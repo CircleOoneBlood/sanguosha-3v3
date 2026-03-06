@@ -25,8 +25,12 @@ export interface RoomSnapshot {
   players: PlayerSnapshot[];
   turnPlayerId?: string;
   round: number;
+  phase?: "draw" | "play" | "discard";
+  slashUsedInTurn?: number;
   pendingAction?: PendingAction;
   winnerTeam?: Team;
+  drawPileCount?: number;
+  discardPileCount?: number;
   log: string[];
 }
 

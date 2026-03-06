@@ -88,6 +88,8 @@ export function App() {
           <h2>对局状态：{room.status}</h2>
           <p>回合轮次：{room.round}</p>
           <p>当前行动玩家：{room.turnPlayerId ?? "未开始"}</p>
+          <p>当前阶段：{room.phase ?? "-"} ｜ 本回合已出杀：{room.slashUsedInTurn ?? 0}</p>
+          <p>牌堆：{room.drawPileCount ?? 0} ｜ 弃牌堆：{room.discardPileCount ?? 0}</p>
           {room.winnerTeam && <p>🏆 胜方阵营：{room.winnerTeam}</p>}
           {room.pendingAction && <p>⏳ 待响应：{room.pendingAction.message}</p>}
 

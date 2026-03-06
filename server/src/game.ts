@@ -11,8 +11,12 @@ interface RoomState {
   players: PlayerState[];
   turnPlayerId?: string;
   round: number;
+  phase?: "draw" | "play" | "discard";
+  slashUsedInTurn: number;
   pendingAction?: PendingAction;
   winnerTeam?: Team;
+  drawPile: CardKind[];
+  discardPile: CardKind[];
   log: string[];
 }
 
@@ -27,6 +31,9 @@ export class GameManager {
       status: "lobby",
       players: [this.createPlayer(playerId, socketId, name, 1)],
       round: 0,
+      slashUsedInTurn: 0,
+      drawPile: [],
+      discardPile: [],
       log: [`${name} 创建了房间`]
     };
     this.rooms.set(roomId, room);
@@ -56,12 +63,15 @@ export class GameManager {
       throw new Error("只有房主可以开始");
     }
 
+    room.drawPile = this.createDeck();
+    room.discardPile = [];
+
     const shuffled = [...room.players].sort(() => Math.random() - 0.5);
     shuffled.forEach((player, i) => {
       const team: Team = i % 2 === 0 ? "A" : "B";
       player.team = team;
       player.hp = 4;
-      player.hand = this.drawCards(4);
+      player.hand = this.drawCards(room, 4);
       player.handCount = player.hand.length;
       player.isAlive = true;
     });
@@ -70,9 +80,12 @@ export class GameManager {
     room.status = "playing";
     room.round = 1;
     room.turnPlayerId = room.players[0]?.id;
+    room.phase = "draw";
+    room.slashUsedInTurn = 0;
     room.pendingAction = undefined;
     room.winnerTeam = undefined;
     this.drawForTurn(room, room.turnPlayerId!);
+    room.phase = "play";
     room.log.push("游戏开始：3v3 对战开始");
   }
 
@@ -80,13 +93,20 @@ export class GameManager {
     const room = this.mustGetRoom(roomId);
     this.assertPlayingTurn(room, actorPlayerId);
     if (room.pendingAction) throw new Error("当前有待响应动作");
+    if (room.phase !== "play") throw new Error("当前不在出牌阶段");
+    if (room.slashUsedInTurn >= 1) throw new Error("每回合仅可使用一次【杀】");
 
     const actor = this.mustFindPlayer(room, actorPlayerId);
     const target = this.mustFindPlayer(room, targetPlayerId);
 
     if (!target.isAlive) throw new Error("目标已阵亡");
     if (actor.team === target.team) throw new Error("不能攻击队友");
-    this.consumeCard(actor, "slash");
+    if (this.seatDistance(actor.seat, target.seat, room.players.length) > 1) {
+      throw new Error("目标不在攻击范围内");
+    }
+
+    this.consumeCard(room, actor, "slash");
+    room.slashUsedInTurn += 1;
     room.log.push(`${actor.name} 对 ${target.name} 使用【杀】`);
 
     if (target.hand.includes("dodge")) {
@@ -109,7 +129,7 @@ export class GameManager {
     if (pending.targetPlayerId !== actorPlayerId) throw new Error("不是你的响应时机");
 
     const target = this.mustFindPlayer(room, actorPlayerId);
-    this.consumeCard(target, "dodge");
+    this.consumeCard(room, target, "dodge");
     room.log.push(`${target.name} 打出【闪】，抵消了【杀】`);
     room.pendingAction = undefined;
   }
@@ -130,7 +150,7 @@ export class GameManager {
     if (pending.targetPlayerId !== actorPlayerId) throw new Error("不是你的响应时机");
 
     const target = this.mustFindPlayer(room, actorPlayerId);
-    this.consumeCard(target, "peach");
+    this.consumeCard(room, target, "peach");
     target.hp = 1;
     room.pendingAction = undefined;
     room.log.push(`${target.name} 使用【桃】成功自救，回复至 1 HP`);
@@ -144,6 +164,7 @@ export class GameManager {
 
     const target = this.mustFindPlayer(room, actorPlayerId);
     target.isAlive = false;
+    room.discardPile.push(...target.hand);
     target.hand = [];
     target.handCount = 0;
     room.pendingAction = undefined;
@@ -156,16 +177,22 @@ export class GameManager {
     this.assertPlayingTurn(room, actorPlayerId);
     if (room.pendingAction) throw new Error("当前有待响应动作");
 
+    const actor = this.mustFindPlayer(room, actorPlayerId);
+    room.phase = "discard";
+    this.autoDiscardToLimit(room, actor);
+
     const alive = room.players.filter((p) => p.isAlive);
     const idx = alive.findIndex((p) => p.id === actorPlayerId);
     const next = alive[(idx + 1) % alive.length];
     room.turnPlayerId = next.id;
     if (idx === alive.length - 1) room.round += 1;
 
-    const actor = room.players.find((p) => p.id === actorPlayerId);
     const nextPlayer = room.players.find((p) => p.id === next.id);
-    room.log.push(`${actor?.name} 结束回合，轮到 ${nextPlayer?.name}`);
+    room.log.push(`${actor.name} 结束回合，轮到 ${nextPlayer?.name}`);
+    room.phase = "draw";
+    room.slashUsedInTurn = 0;
     this.drawForTurn(room, next.id);
+    room.phase = "play";
   }
 
   getRoomSnapshot(roomId: string): RoomSnapshot {
@@ -176,9 +203,13 @@ export class GameManager {
       players: room.players.map(({ socketId: _, ...rest }) => rest),
       turnPlayerId: room.turnPlayerId,
       round: room.round,
+      phase: room.phase,
+      slashUsedInTurn: room.slashUsedInTurn,
       pendingAction: room.pendingAction,
       winnerTeam: room.winnerTeam,
-      log: room.log.slice(-30)
+      drawPileCount: room.drawPile.length,
+      discardPileCount: room.discardPile.length,
+      log: room.log.slice(-40)
     };
   }
 
@@ -219,10 +250,11 @@ export class GameManager {
     if (room.winnerTeam) throw new Error("对局已结束");
   }
 
-  private consumeCard(player: PlayerState, card: CardKind) {
+  private consumeCard(room: RoomState, player: PlayerState, card: CardKind) {
     const idx = player.hand.indexOf(card);
     if (idx < 0) throw new Error(`你没有【${this.cardLabel(card)}】`);
-    player.hand.splice(idx, 1);
+    const [discarded] = player.hand.splice(idx, 1);
+    room.discardPile.push(discarded);
     player.handCount = player.hand.length;
   }
 
@@ -247,6 +279,7 @@ export class GameManager {
     }
 
     target.isAlive = false;
+    room.discardPile.push(...target.hand);
     target.hand = [];
     target.handCount = 0;
     room.log.push(`${target.name} 阵亡`);
@@ -261,6 +294,7 @@ export class GameManager {
       room.status = "ended";
       room.winnerTeam = aliveA > 0 ? "A" : "B";
       room.turnPlayerId = undefined;
+      room.phase = undefined;
       room.pendingAction = undefined;
       room.log.push(`对局结束：${room.winnerTeam} 阵营获胜`);
     }
@@ -269,21 +303,55 @@ export class GameManager {
   private drawForTurn(room: RoomState, playerId: string) {
     const player = this.mustFindPlayer(room, playerId);
     if (!player.isAlive) return;
-    const drawn = this.drawCards(2);
+    const drawn = this.drawCards(room, 2);
     player.hand.push(...drawn);
     player.handCount = player.hand.length;
     room.log.push(`${player.name} 摸牌 ${drawn.map((c) => `【${this.cardLabel(c)}】`).join(" ")}`);
   }
 
-  private drawCards(n: number): CardKind[] {
+  private drawCards(room: RoomState, n: number): CardKind[] {
     const cards: CardKind[] = [];
     for (let i = 0; i < n; i++) {
-      const r = Math.random();
-      if (r < 0.5) cards.push("slash");
-      else if (r < 0.8) cards.push("dodge");
-      else cards.push("peach");
+      if (room.drawPile.length === 0) {
+        if (room.discardPile.length === 0) break;
+        room.drawPile = this.shuffle(room.discardPile.splice(0));
+        room.log.push("牌堆耗尽，已将弃牌堆洗入摸牌堆");
+      }
+      const top = room.drawPile.pop();
+      if (top) cards.push(top);
     }
     return cards;
+  }
+
+  private createDeck(): CardKind[] {
+    const deck: CardKind[] = [];
+    for (let i = 0; i < 48; i++) deck.push("slash");
+    for (let i = 0; i < 28; i++) deck.push("dodge");
+    for (let i = 0; i < 20; i++) deck.push("peach");
+    return this.shuffle(deck);
+  }
+
+  private shuffle<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  private autoDiscardToLimit(room: RoomState, player: PlayerState) {
+    while (player.hand.length > player.hp) {
+      const card = player.hand.pop();
+      if (!card) break;
+      room.discardPile.push(card);
+    }
+    player.handCount = player.hand.length;
+  }
+
+  private seatDistance(a: number, b: number, total: number) {
+    const d = Math.abs(a - b);
+    return Math.min(d, total - d);
   }
 
   private cardLabel(card: CardKind) {
