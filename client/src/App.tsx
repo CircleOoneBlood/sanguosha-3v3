@@ -26,9 +26,16 @@ export function App() {
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
 
-    ws.onopen = () => setWsReady(true);
-    ws.onclose = () => setWsReady(false);
-    ws.onerror = () => setError("WebSocket 连接失败");
+    ws.onopen = () => {
+      setWsReady(true);
+      setError(null);
+    };
+    ws.onclose = () => {
+      setWsReady(false);
+    };
+    ws.onerror = () => {
+      setError("WebSocket 连接失败");
+    };
 
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data) as ServerMessage;
