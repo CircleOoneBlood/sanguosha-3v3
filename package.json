@@ -11,7 +11,8 @@
     "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "lint": "echo 'lint placeholder'",
-    "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client"
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client",
+    "test:smoke": "node scripts-smoke-test.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.0.1",
