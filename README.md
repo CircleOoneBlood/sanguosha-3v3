@@ -34,6 +34,13 @@ npm install
 npm run dev
 ```
 
+若遇到端口占用（EADDRINUSE），使用：
+
+```bash
+npm run dev:clean
+npm run dev:safe
+```
+
 默认地址：
 - 前端: http://localhost:5173
 - 后端 WS: ws://localhost:3001

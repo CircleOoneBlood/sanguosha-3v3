@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev:clean": "bash ./scripts/dev-clean.sh",
+    "dev:safe": "npm run dev:clean && npm run dev",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "lint": "echo 'lint placeholder'",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client",
