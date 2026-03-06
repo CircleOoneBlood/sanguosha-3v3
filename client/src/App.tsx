@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClientMessage, RoomSnapshot, ServerMessage } from "../../shared/src/index";
+import type { CardKind, ClientMessage, RoomSnapshot, ServerMessage } from "../../shared/src/index";
 
 const WS_URL = "ws://localhost:3001";
+
+const cardLabel: Record<CardKind, string> = {
+  slash: "杀",
+  dodge: "闪",
+  peach: "桃"
+};
 
 export function App() {
   const [wsReady, setWsReady] = useState(false);
@@ -37,6 +43,9 @@ export function App() {
   }, []);
 
   const canOperate = useMemo(() => wsReady && !!name.trim(), [wsReady, name]);
+  const me = room?.players.find((p) => p.id === playerId);
+  const isMyTurn = room?.turnPlayerId === playerId;
+  const canStart = room?.status === "lobby";
 
   function send(msg: ClientMessage) {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -79,19 +88,62 @@ export function App() {
           <h2>对局状态：{room.status}</h2>
           <p>回合轮次：{room.round}</p>
           <p>当前行动玩家：{room.turnPlayerId ?? "未开始"}</p>
+          {room.winnerTeam && <p>🏆 胜方阵营：{room.winnerTeam}</p>}
+          {room.pendingAction && <p>⏳ 待响应：{room.pendingAction.message}</p>}
 
           <div className="row">
-            <button onClick={() => send({ type: "start_game" })}>开始游戏（房主）</button>
-            <button disabled={room.turnPlayerId !== playerId} onClick={() => send({ type: "end_turn" })}>
+            <button disabled={!canStart} onClick={() => send({ type: "start_game" })}>
+              开始游戏（房主）
+            </button>
+            <button disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing"} onClick={() => send({ type: "end_turn" })}>
               结束我的回合
             </button>
           </div>
+
+          {me && (
+            <section className="card">
+              <h3>我的信息</h3>
+              <p>
+                你是 [{me.seat}] {me.name} | 阵营 {me.team} | HP {me.hp}
+              </p>
+              <p>手牌：{me.hand.map((c, i) => <span key={`${c}-${i}`} className="tag">{cardLabel[c]}</span>)}</p>
+
+              <h4>出杀目标</h4>
+              <div className="row">
+                {room.players
+                  .filter((p) => p.id !== me.id && p.isAlive && p.team !== me.team)
+                  .map((enemy) => (
+                    <button
+                      key={enemy.id}
+                      disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing"}
+                      onClick={() => send({ type: "play_slash", targetPlayerId: enemy.id })}
+                    >
+                      杀 {enemy.name}
+                    </button>
+                  ))}
+              </div>
+
+              {room.pendingAction?.targetPlayerId === me.id && room.pendingAction.type === "await_dodge" && (
+                <div className="row">
+                  <button onClick={() => send({ type: "respond_dodge" })}>打出闪</button>
+                  <button onClick={() => send({ type: "accept_hit" })}>不闪（吃伤害）</button>
+                </div>
+              )}
+
+              {room.pendingAction?.targetPlayerId === me.id && room.pendingAction.type === "await_peach" && (
+                <div className="row">
+                  <button onClick={() => send({ type: "use_peach" })}>打出桃自救</button>
+                  <button onClick={() => send({ type: "accept_death" })}>放弃自救</button>
+                </div>
+              )}
+            </section>
+          )}
 
           <h3>玩家列表</h3>
           <ul>
             {room.players.map((p) => (
               <li key={p.id}>
-                [{p.seat}] {p.name} | 阵营 {p.team} | HP {p.hp} | 手牌 {p.handCount}
+                [{p.seat}] {p.name} | 阵营 {p.team} | HP {p.hp} | 手牌 {p.handCount} | {p.isAlive ? "存活" : "阵亡"}
                 {room.turnPlayerId === p.id ? " ← 当前回合" : ""}
               </li>
             ))}

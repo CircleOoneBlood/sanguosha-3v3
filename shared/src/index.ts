@@ -1,4 +1,12 @@
 export type Team = "A" | "B";
+export type CardKind = "slash" | "dodge" | "peach";
+
+export interface PendingAction {
+  type: "await_dodge" | "await_peach";
+  sourcePlayerId: string;
+  targetPlayerId: string;
+  message: string;
+}
 
 export interface PlayerSnapshot {
   id: string;
@@ -7,6 +15,7 @@ export interface PlayerSnapshot {
   team: Team;
   hp: number;
   handCount: number;
+  hand: CardKind[];
   isAlive: boolean;
 }
 
@@ -16,6 +25,8 @@ export interface RoomSnapshot {
   players: PlayerSnapshot[];
   turnPlayerId?: string;
   round: number;
+  pendingAction?: PendingAction;
+  winnerTeam?: Team;
   log: string[];
 }
 
@@ -24,6 +35,11 @@ export type ClientMessage =
   | { type: "create_room"; name: string }
   | { type: "start_game" }
   | { type: "end_turn" }
+  | { type: "play_slash"; targetPlayerId: string }
+  | { type: "respond_dodge" }
+  | { type: "accept_hit" }
+  | { type: "use_peach" }
+  | { type: "accept_death" }
   | { type: "ping" };
 
 export type ServerMessage =

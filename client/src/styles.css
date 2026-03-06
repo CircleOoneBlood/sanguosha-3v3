@@ -60,3 +60,11 @@ pre {
   padding: 10px;
   overflow: auto;
 }
+
+.tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #3d4554;
+}

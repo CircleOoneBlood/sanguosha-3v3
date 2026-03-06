@@ -31,9 +31,7 @@ wss.on("connection", (ws) => {
     try {
       const msg = JSON.parse(raw.toString()) as ClientMessage;
 
-      if (msg.type === "ping") {
-        return send(ws, { type: "pong" });
-      }
+      if (msg.type === "ping") return send(ws, { type: "pong" });
 
       if (msg.type === "create_room") {
         const { roomId, playerId } = game.createRoom(msg.name, socketId);
@@ -43,9 +41,10 @@ wss.on("connection", (ws) => {
       }
 
       if (msg.type === "join_room") {
-        const { playerId } = game.joinRoom(msg.roomId.toUpperCase(), msg.name, socketId);
-        send(ws, { type: "joined", roomId: msg.roomId.toUpperCase(), playerId });
-        broadcastRoom(msg.roomId.toUpperCase());
+        const roomId = msg.roomId.toUpperCase();
+        const { playerId } = game.joinRoom(roomId, msg.name, socketId);
+        send(ws, { type: "joined", roomId, playerId });
+        broadcastRoom(roomId);
         return;
       }
 
@@ -54,11 +53,13 @@ wss.on("connection", (ws) => {
       const actor = game.getPlayerBySocket(room.id, socketId);
       if (!actor) throw new Error("玩家不存在");
 
-      if (msg.type === "start_game") {
-        game.startGame(room.id, actor.id);
-      } else if (msg.type === "end_turn") {
-        game.endTurn(room.id, actor.id);
-      }
+      if (msg.type === "start_game") game.startGame(room.id, actor.id);
+      else if (msg.type === "end_turn") game.endTurn(room.id, actor.id);
+      else if (msg.type === "play_slash") game.playSlash(room.id, actor.id, msg.targetPlayerId);
+      else if (msg.type === "respond_dodge") game.respondDodge(room.id, actor.id);
+      else if (msg.type === "accept_hit") game.acceptHit(room.id, actor.id);
+      else if (msg.type === "use_peach") game.usePeach(room.id, actor.id);
+      else if (msg.type === "accept_death") game.acceptDeath(room.id, actor.id);
 
       broadcastRoom(room.id);
     } catch (error) {
