@@ -176,23 +176,47 @@ export class GameManager {
     const room = this.mustGetRoom(roomId);
     this.assertPlayingTurn(room, actorPlayerId);
     if (room.pendingAction) throw new Error("当前有待响应动作");
+    if (room.phase !== "play") throw new Error("当前不在出牌阶段");
+
+    this.startDiscardPhase(room, actorPlayerId);
+  }
+
+  discardCard(roomId: string, actorPlayerId: string, card: CardKind) {
+    const room = this.mustGetRoom(roomId);
+    this.assertPlayingTurn(room, actorPlayerId);
+    const pending = room.pendingAction;
+    if (!pending || pending.type !== "await_discard") throw new Error("当前无需弃牌");
+    if (pending.targetPlayerId !== actorPlayerId) throw new Error("不是你的弃牌时机");
 
     const actor = this.mustFindPlayer(room, actorPlayerId);
-    room.phase = "discard";
-    this.autoDiscardToLimit(room, actor);
+    this.consumeCard(room, actor, card);
+    room.log.push(`${actor.name} 弃置【${this.cardLabel(card)}】`);
 
-    const alive = room.players.filter((p) => p.isAlive);
-    const idx = alive.findIndex((p) => p.id === actorPlayerId);
-    const next = alive[(idx + 1) % alive.length];
-    room.turnPlayerId = next.id;
-    if (idx === alive.length - 1) room.round += 1;
+    if (actor.hand.length <= actor.hp) {
+      room.pendingAction = undefined;
+      this.advanceTurn(room, actorPlayerId);
+    } else {
+      room.pendingAction = {
+        type: "await_discard",
+        sourcePlayerId: actor.id,
+        targetPlayerId: actor.id,
+        message: `${actor.name} 需要继续弃牌（当前 ${actor.hand.length}/${actor.hp}）`
+      };
+    }
+  }
 
-    const nextPlayer = room.players.find((p) => p.id === next.id);
-    room.log.push(`${actor.name} 结束回合，轮到 ${nextPlayer?.name}`);
-    room.phase = "draw";
-    room.slashUsedInTurn = 0;
-    this.drawForTurn(room, next.id);
-    room.phase = "play";
+  finishDiscard(roomId: string, actorPlayerId: string) {
+    const room = this.mustGetRoom(roomId);
+    this.assertPlayingTurn(room, actorPlayerId);
+    const pending = room.pendingAction;
+    if (!pending || pending.type !== "await_discard") throw new Error("当前无需完成弃牌");
+    if (pending.targetPlayerId !== actorPlayerId) throw new Error("不是你的弃牌时机");
+
+    const actor = this.mustFindPlayer(room, actorPlayerId);
+    if (actor.hand.length > actor.hp) throw new Error("手牌仍超过体力上限，不能结束弃牌");
+
+    room.pendingAction = undefined;
+    this.advanceTurn(room, actorPlayerId);
   }
 
   getRoomSnapshot(roomId: string): RoomSnapshot {
@@ -340,13 +364,39 @@ export class GameManager {
     return a;
   }
 
-  private autoDiscardToLimit(room: RoomState, player: PlayerState) {
-    while (player.hand.length > player.hp) {
-      const card = player.hand.pop();
-      if (!card) break;
-      room.discardPile.push(card);
+  private startDiscardPhase(room: RoomState, actorPlayerId: string) {
+    const actor = this.mustFindPlayer(room, actorPlayerId);
+    room.phase = "discard";
+
+    if (actor.hand.length <= actor.hp) {
+      room.log.push(`${actor.name} 无需弃牌`);
+      this.advanceTurn(room, actorPlayerId);
+      return;
     }
-    player.handCount = player.hand.length;
+
+    room.pendingAction = {
+      type: "await_discard",
+      sourcePlayerId: actor.id,
+      targetPlayerId: actor.id,
+      message: `${actor.name} 需要弃牌至 ${actor.hp} 张（当前 ${actor.hand.length}）`
+    };
+  }
+
+  private advanceTurn(room: RoomState, actorPlayerId: string) {
+    const alive = room.players.filter((p) => p.isAlive);
+    const idx = alive.findIndex((p) => p.id === actorPlayerId);
+    const next = alive[(idx + 1) % alive.length];
+    const actor = this.mustFindPlayer(room, actorPlayerId);
+
+    room.turnPlayerId = next.id;
+    if (idx === alive.length - 1) room.round += 1;
+
+    const nextPlayer = room.players.find((p) => p.id === next.id);
+    room.log.push(`${actor.name} 结束回合，轮到 ${nextPlayer?.name}`);
+    room.phase = "draw";
+    room.slashUsedInTurn = 0;
+    this.drawForTurn(room, next.id);
+    room.phase = "play";
   }
 
   private seatDistance(a: number, b: number, total: number) {

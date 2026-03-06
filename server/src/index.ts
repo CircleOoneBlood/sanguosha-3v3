@@ -60,6 +60,8 @@ wss.on("connection", (ws) => {
       else if (msg.type === "accept_hit") game.acceptHit(room.id, actor.id);
       else if (msg.type === "use_peach") game.usePeach(room.id, actor.id);
       else if (msg.type === "accept_death") game.acceptDeath(room.id, actor.id);
+      else if (msg.type === "discard_card") game.discardCard(room.id, actor.id, msg.card);
+      else if (msg.type === "finish_discard") game.finishDiscard(room.id, actor.id);
 
       broadcastRoom(room.id);
     } catch (error) {

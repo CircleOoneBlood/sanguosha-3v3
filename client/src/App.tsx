@@ -97,7 +97,7 @@ export function App() {
             <button disabled={!canStart} onClick={() => send({ type: "start_game" })}>
               开始游戏（房主）
             </button>
-            <button disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing"} onClick={() => send({ type: "end_turn" })}>
+            <button disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing" || room.phase !== "play"} onClick={() => send({ type: "end_turn" })}>
               结束我的回合
             </button>
           </div>
@@ -117,7 +117,7 @@ export function App() {
                   .map((enemy) => (
                     <button
                       key={enemy.id}
-                      disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing"}
+                      disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing" || room.phase !== "play"}
                       onClick={() => send({ type: "play_slash", targetPlayerId: enemy.id })}
                     >
                       杀 {enemy.name}
@@ -136,6 +136,20 @@ export function App() {
                 <div className="row">
                   <button onClick={() => send({ type: "use_peach" })}>打出桃自救</button>
                   <button onClick={() => send({ type: "accept_death" })}>放弃自救</button>
+                </div>
+              )}
+
+              {room.pendingAction?.targetPlayerId === me.id && room.pendingAction.type === "await_discard" && (
+                <div>
+                  <h4>弃牌阶段</h4>
+                  <div className="row">
+                    {(["slash", "dodge", "peach"] as CardKind[]).map((c) => (
+                      <button key={c} onClick={() => send({ type: "discard_card", card: c })}>
+                        弃 {cardLabel[c]}
+                      </button>
+                    ))}
+                    <button onClick={() => send({ type: "finish_discard" })}>完成弃牌</button>
+                  </div>
                 </div>
               )}
             </section>

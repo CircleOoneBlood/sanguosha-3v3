@@ -2,7 +2,7 @@ export type Team = "A" | "B";
 export type CardKind = "slash" | "dodge" | "peach";
 
 export interface PendingAction {
-  type: "await_dodge" | "await_peach";
+  type: "await_dodge" | "await_peach" | "await_discard";
   sourcePlayerId: string;
   targetPlayerId: string;
   message: string;
@@ -44,6 +44,8 @@ export type ClientMessage =
   | { type: "accept_hit" }
   | { type: "use_peach" }
   | { type: "accept_death" }
+  | { type: "discard_card"; card: CardKind }
+  | { type: "finish_discard" }
   | { type: "ping" };
 
 export type ServerMessage =
