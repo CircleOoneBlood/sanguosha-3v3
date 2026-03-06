@@ -138,8 +138,14 @@ export function App() {
               </p>
               <p>手牌：{me.hand.map((c, i) => <span key={`${c}-${i}`} className="tag">{cardLabel[c]}</span>)}</p>
 
-              <h4>出杀目标</h4>
+              <h4>出牌操作</h4>
               <div className="row">
+                <button
+                  disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing" || room.phase !== "play" || me.hp >= 4}
+                  onClick={() => send({ type: "play_peach_self" })}
+                >
+                  吃桃回血
+                </button>
                 {room.players
                   .filter((p) => p.id !== me.id && p.isAlive && p.team !== me.team)
                   .map((enemy) => (

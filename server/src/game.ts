@@ -118,7 +118,9 @@ export class GameManager {
 
       const canAggro = turn.hand.includes("slash") && room.slashUsedInTurn < 1;
 
-      if (room.phase === "play" && canAggro && inRange[0]) {
+      if (room.phase === "play" && turn.hp <= 2 && turn.hand.includes("peach")) {
+        this.playPeachSelf(room.id, turn.id);
+      } else if (room.phase === "play" && canAggro && inRange[0]) {
         this.playSlash(room.id, turn.id, inRange[0].id);
       } else if (room.phase === "play") {
         this.endTurn(room.id, turn.id);
@@ -234,6 +236,19 @@ export class GameManager {
     target.hp = 1;
     room.pendingAction = undefined;
     room.log.push(`${target.name} 使用【桃】成功自救，回复至 1 HP`);
+  }
+
+  playPeachSelf(roomId: string, actorPlayerId: string) {
+    const room = this.mustGetRoom(roomId);
+    this.assertPlayingTurn(room, actorPlayerId);
+    if (room.pendingAction) throw new Error("当前有待响应动作");
+    if (room.phase !== "play") throw new Error("当前不在出牌阶段");
+
+    const actor = this.mustFindPlayer(room, actorPlayerId);
+    if (actor.hp >= 4) throw new Error("体力已满，无需使用桃");
+    this.consumeCard(room, actor, "peach");
+    actor.hp += 1;
+    room.log.push(`${actor.name} 在出牌阶段使用【桃】，回复至 ${actor.hp} HP`);
   }
 
   acceptDeath(roomId: string, actorPlayerId: string) {

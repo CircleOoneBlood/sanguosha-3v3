@@ -46,6 +46,7 @@ export type ClientMessage =
   | { type: "accept_hit" }
   | { type: "use_peach" }
   | { type: "accept_death" }
+  | { type: "play_peach_self" }
   | { type: "discard_card"; card: CardKind }
   | { type: "finish_discard" }
   | { type: "ping" };
