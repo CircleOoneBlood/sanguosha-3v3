@@ -116,9 +116,14 @@ export function App() {
               开始游戏（房主）
             </button>
             {showDevStart && (
-              <button disabled={!canStart} onClick={() => send({ type: "start_game", devBypass: true })}>
-                测试开局（2+人）
-              </button>
+              <>
+                <button disabled={!canStart} onClick={() => send({ type: "start_game", devBypass: true })}>
+                  测试开局（2+人）
+                </button>
+                <button disabled={!canStart} onClick={() => send({ type: "add_bots", count: 5 })}>
+                  补齐机器人到6人
+                </button>
+              </>
             )}
             <button disabled={!isMyTurn || !!room.pendingAction || room.status !== "playing" || room.phase !== "play"} onClick={() => send({ type: "end_turn" })}>
               结束我的回合
@@ -182,7 +187,7 @@ export function App() {
           <ul>
             {room.players.map((p) => (
               <li key={p.id}>
-                [{p.seat}] {p.name} | 阵营 {p.team} | HP {p.hp} | 手牌 {p.handCount} | {p.isAlive ? "存活" : "阵亡"}
+                [{p.seat}] {p.name}{p.isBot ? "🤖" : ""} | 阵营 {p.team} | HP {p.hp} | 手牌 {p.handCount} | {p.isAlive ? "存活" : "阵亡"}
                 {room.turnPlayerId === p.id ? " ← 当前回合" : ""}
               </li>
             ))}

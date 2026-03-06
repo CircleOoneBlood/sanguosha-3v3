@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import type { CardKind, PendingAction, PlayerSnapshot, RoomSnapshot, Team } from "../../shared/src/index";
 
 interface PlayerState extends PlayerSnapshot {
-  socketId: string;
+  socketId?: string;
 }
 
 interface RoomState {
@@ -51,6 +51,73 @@ export class GameManager {
     room.log.push(`${name} 加入了房间`);
 
     return { playerId };
+  }
+
+  addBots(roomId: string, actorPlayerId: string, count = 5) {
+    const room = this.mustGetRoom(roomId);
+    if (room.status !== "lobby") throw new Error("仅可在房间阶段添加机器人");
+
+    const allowDevBypass = process.env.ALLOW_DEV_BYPASS === "1";
+    if (!allowDevBypass) throw new Error("未开启开发测试后门");
+
+    const actor = room.players.find((p) => p.id === actorPlayerId);
+    if (!actor || room.players[0].id !== actor.id) throw new Error("只有房主可添加机器人");
+
+    const free = 6 - room.players.length;
+    const toAdd = Math.max(0, Math.min(count, free));
+    for (let i = 0; i < toAdd; i++) {
+      const id = nanoid(8);
+      const botNo = room.players.filter((p) => p.isBot).length + 1;
+      room.players.push(this.createPlayer(id, undefined, `Bot-${botNo}`, room.players.length + 1, true));
+    }
+    room.log.push(`已添加 ${toAdd} 个机器人（当前 ${room.players.length}/6）`);
+  }
+
+  runBotLoop(roomId: string, maxSteps = 20) {
+    const room = this.mustGetRoom(roomId);
+    let steps = 0;
+
+    while (steps < maxSteps && room.status === "playing") {
+      steps += 1;
+
+      const pending = room.pendingAction;
+      if (pending) {
+        const target = this.mustFindPlayer(room, pending.targetPlayerId);
+        if (!target.isBot) break;
+
+        if (pending.type === "await_dodge") {
+          if (target.hand.includes("dodge")) this.respondDodge(room.id, target.id);
+          else this.acceptHit(room.id, target.id);
+          continue;
+        }
+        if (pending.type === "await_peach") {
+          if (target.hand.includes("peach")) this.usePeach(room.id, target.id);
+          else this.acceptDeath(room.id, target.id);
+          continue;
+        }
+        if (pending.type === "await_discard") {
+          if (target.hand.length > target.hp) {
+            this.discardCard(room.id, target.id, target.hand[0]);
+          } else {
+            this.finishDiscard(room.id, target.id);
+          }
+          continue;
+        }
+      }
+
+      const turn = room.turnPlayerId ? this.mustFindPlayer(room, room.turnPlayerId) : undefined;
+      if (!turn || !turn.isBot) break;
+
+      const enemies = room.players.filter((p) => p.isAlive && p.team !== turn.team);
+      const inRange = enemies.find((e) => this.seatDistance(turn.seat, e.seat, room.players.length) <= 1);
+      if (room.phase === "play" && turn.hand.includes("slash") && inRange && room.slashUsedInTurn < 1) {
+        this.playSlash(room.id, turn.id, inRange.id);
+      } else if (room.phase === "play") {
+        this.endTurn(room.id, turn.id);
+      } else {
+        break;
+      }
+    }
   }
 
   startGame(roomId: string, actorPlayerId: string, options?: { devBypass?: boolean }) {
@@ -243,12 +310,12 @@ export class GameManager {
   }
 
   getRoomBySocket(socketId: string): RoomState | undefined {
-    return [...this.rooms.values()].find((room) => room.players.some((p) => p.socketId === socketId));
+    return [...this.rooms.values()].find((room) => room.players.some((p) => p.socketId && p.socketId === socketId));
   }
 
   getPlayerBySocket(roomId: string, socketId: string): PlayerState | undefined {
     const room = this.rooms.get(roomId);
-    return room?.players.find((p) => p.socketId === socketId);
+    return room?.players.find((p) => p.socketId && p.socketId === socketId);
   }
 
   removeSocket(socketId: string) {
@@ -257,8 +324,8 @@ export class GameManager {
     room.log.push(`玩家掉线：${socketId.slice(0, 6)}`);
   }
 
-  private createPlayer(id: string, socketId: string, name: string, seat: number): PlayerState {
-    return { id, socketId, name, seat, team: "A", hp: 4, handCount: 0, hand: [], isAlive: true };
+  private createPlayer(id: string, socketId: string | undefined, name: string, seat: number, isBot = false): PlayerState {
+    return { id, socketId, name, seat, team: "A", hp: 4, handCount: 0, hand: [], isAlive: true, isBot };
   }
 
   private mustGetRoom(roomId: string) {

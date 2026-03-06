@@ -54,6 +54,7 @@ wss.on("connection", (ws) => {
       if (!actor) throw new Error("玩家不存在");
 
       if (msg.type === "start_game") game.startGame(room.id, actor.id, { devBypass: msg.devBypass === true });
+      else if (msg.type === "add_bots") game.addBots(room.id, actor.id, msg.count ?? 5);
       else if (msg.type === "end_turn") game.endTurn(room.id, actor.id);
       else if (msg.type === "play_slash") game.playSlash(room.id, actor.id, msg.targetPlayerId);
       else if (msg.type === "respond_dodge") game.respondDodge(room.id, actor.id);
@@ -63,6 +64,7 @@ wss.on("connection", (ws) => {
       else if (msg.type === "discard_card") game.discardCard(room.id, actor.id, msg.card);
       else if (msg.type === "finish_discard") game.finishDiscard(room.id, actor.id);
 
+      game.runBotLoop(room.id);
       broadcastRoom(room.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "服务器错误";
