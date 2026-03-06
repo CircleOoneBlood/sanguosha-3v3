@@ -1,0 +1,49 @@
+# Sanguosha 3v3 Web
+
+三国杀 3v3 网页联机版（MVP 起步仓库）。
+
+## 当前已完成（MVP V0）
+
+- Monorepo: `client` + `server` + `shared`
+- WebSocket 房间系统：创建 / 加入
+- 3v3 人数限制：6 人满员才可开局
+- 开局后自动分队（A/B）+ 回合轮转
+- 前端房间页可实时展示玩家与日志
+
+## 技术栈
+
+- Client: React + Vite + TypeScript
+- Server: Node.js + TypeScript + ws
+- Shared: 前后端共享类型定义
+
+## 本地开发
+
+```bash
+npm install
+npm run dev
+```
+
+默认地址：
+- 前端: http://localhost:5173
+- 后端 WS: ws://localhost:3001
+
+## GitHub 推送
+
+```bash
+cd dev/sanguosha-3v3
+git branch -M main
+git add .
+git commit -m "feat: bootstrap sanguosha 3v3 web mvp"
+# 把 YOUR_REPO_URL 换成你的 github 仓库地址
+git remote add origin YOUR_REPO_URL
+git push -u origin main
+```
+
+## 下一阶段（我建议按这个顺序）
+
+1. **规则核心**：出牌阶段、响应链（闪/无懈）、伤害结算
+2. **牌堆系统**：抽牌/弃牌/洗牌、牌类型（杀闪桃等）
+3. **武将系统**：3v3 常用武将 + 技能触发框架
+4. **胜负判定**：阵亡、投降、断线重连与托管
+5. **对局记录**：操作日志、replay 基础数据结构
+
