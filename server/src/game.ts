@@ -97,7 +97,10 @@ export class GameManager {
         }
         if (pending.type === "await_discard") {
           if (target.hand.length > target.hp) {
-            this.discardCard(room.id, target.id, target.hand[0]);
+            const preferKeepPeach = target.hp <= 2;
+            const discard =
+              (preferKeepPeach ? target.hand.find((c) => c !== "peach") : undefined) ?? target.hand[0];
+            this.discardCard(room.id, target.id, discard);
           } else {
             this.finishDiscard(room.id, target.id);
           }
@@ -109,9 +112,14 @@ export class GameManager {
       if (!turn || !turn.isBot) break;
 
       const enemies = room.players.filter((p) => p.isAlive && p.team !== turn.team);
-      const inRange = enemies.find((e) => this.seatDistance(turn.seat, e.seat, room.players.length) <= 1);
-      if (room.phase === "play" && turn.hand.includes("slash") && inRange && room.slashUsedInTurn < 1) {
-        this.playSlash(room.id, turn.id, inRange.id);
+      const inRange = enemies
+        .filter((e) => this.seatDistance(turn.seat, e.seat, room.players.length) <= 1)
+        .sort((a, b) => a.hp - b.hp || a.handCount - b.handCount);
+
+      const canAggro = turn.hand.includes("slash") && room.slashUsedInTurn < 1;
+
+      if (room.phase === "play" && canAggro && inRange[0]) {
+        this.playSlash(room.id, turn.id, inRange[0].id);
       } else if (room.phase === "play") {
         this.endTurn(room.id, turn.id);
       } else {

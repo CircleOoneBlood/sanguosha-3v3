@@ -89,6 +89,16 @@ git remote add origin YOUR_REPO_URL
 git push -u origin main
 ```
 
+## 测试与验收
+
+```bash
+npm run typecheck
+npm run test:smoke
+npm run test:e2e
+```
+
+验收模板见：`TESTING.md`
+
 ## 下一阶段（我建议按这个顺序）
 
 1. **规则核心**：出牌阶段、响应链（闪/无懈）、伤害结算
