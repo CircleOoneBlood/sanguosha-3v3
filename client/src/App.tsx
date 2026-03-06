@@ -23,21 +23,26 @@ export function App() {
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
+    let disposed = false;
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (disposed) return;
       setWsReady(true);
       setError(null);
     };
     ws.onclose = () => {
+      if (disposed) return;
       setWsReady(false);
     };
     ws.onerror = () => {
+      if (disposed) return;
       setError("WebSocket 连接失败");
     };
 
     ws.onmessage = (event) => {
+      if (disposed) return;
       const msg = JSON.parse(event.data) as ServerMessage;
       if (msg.type === "error") setError(msg.message);
       if (msg.type === "joined") {
@@ -48,7 +53,10 @@ export function App() {
       if (msg.type === "room_update") setRoom(msg.room);
     };
 
-    return () => ws.close();
+    return () => {
+      disposed = true;
+      ws.close();
+    };
   }, []);
 
   const canOperate = useMemo(() => wsReady && !!name.trim(), [wsReady, name]);
