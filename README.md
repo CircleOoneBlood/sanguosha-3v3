@@ -38,6 +38,21 @@ npm run dev
 - 前端: http://localhost:5173
 - 后端 WS: ws://localhost:3001
 
+## WebSocket 连接说明
+
+前端默认自动连接：
+- `ws://<当前页面hostname>:3001`（https 下自动用 `wss://`）
+
+你也可以手动指定：
+
+```bash
+# client/.env.local
+VITE_WS_URL=ws://127.0.0.1:3001
+```
+
+如果你在另一台设备（手机/平板）打开前端页面，`localhost` 不会指向运行后端的机器，
+需要把 `VITE_WS_URL` 设置为后端机器可访问的 IP/域名。
+
 ## GitHub 推送
 
 ```bash

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CardKind, ClientMessage, RoomSnapshot, ServerMessage } from "../../shared/src/index";
 
-const WS_URL = "ws://localhost:3001";
+const WS_URL =
+  (import.meta.env.VITE_WS_URL as string | undefined) ||
+  `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:3001`;
 
 const cardLabel: Record<CardKind, string> = {
   slash: "杀",
